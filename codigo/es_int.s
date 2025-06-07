@@ -80,41 +80,51 @@ INIT:
 **********************************************************
 
 SCAN:
+	MOVE.L  4(A7),A1         ;A1 ← dirección del buffer de destino
+	CLR.L   D3               ;D3 ← 0, contador de caracteres leídos
+	MOVE.W  8(A7),D4         ;D4 ← descriptor: 0 para A, 1 para B
+	MOVE.W 10(A7),D2         ;D2 ← número de bytes a leer
+	CLR.L   D0               ;D0 ← 0, valor de retorno
 
-	*cargamos los parametros desde la pila
-	MOVE.L  4(A7),A1            ;A1 puntero al buffer de destino
-	MOVE.W  8(A7),D4            ;D4 descriptor 0 o 1 para leer por A o por B
-	MOVE.W 10(A7),D2            ;D2 bytes a leer
-	CLR.L   D3                  ;ponemos D3 contador a 0 clear D3
-	CLR.L 	D0					;lo iniciamos a 0
+	CMP.W #0,D2              ;¿tamaño es cero?
+	BEQ FNSCAN               ;sí → fin de lectura
 
-	*si tamaño 0 salimos
-	CMP.W #0,D2
-    BEQ FNSCAN
+	CMP.W #0,D4              ;¿descriptor A?
+	BEQ SCANA                ;sí → leer de línea A
+	CMP.W #1,D4              ;¿descriptor B?
+	BEQ SCANB                ;sí → leer de línea B
+	MOVE.L #$FFFFFFFF,D0     ;error: descriptor no válido, D0 ← -1
+	BRA FNSCAN               ;salimos
 
-	*comprobar descriptor
-	CMP.W   #0,D4				;vale si D4 es 0 saltamos al bucle y no hay eror
-	BEQ     BUCSCAN
-	CMP.W   #1,D4				;lo mismo si es 1 saltamos al bucle
-	BEQ 	BUCSCAN
-	MOVE.L 	#$FFFFFFFF,D0		;error ya que D4 no es ni 0 ni 1 osea resultado -1
-	BRA FNSCAN					
+	SCANA:
+	MOVE.L #0,D0             ;D0 ← 0, canal A para LEECAR
+	BSR LEECAR               ;llamamos a LEECAR
+	CMP.L #-1,D0             ;¿buffer vacío?
+	BEQ CONTSCAN             ;sí → salimos con lo leído
+	MOVE.B D0,(A1)+          ;guardamos el byte leído en el buffer
+	ADD.L #1,D3              ;D3++
+	SUB.W #1,D2              ;decrementamos tamaño restante
+	CMP.W #0,D2              ;¿ya leímos todo?
+	BNE SCANA                ;no → seguir leyendo
+	BRA CONTSCAN             ;sí → salimos
 
-	BUCSCAN:
-	MOVE.L  D4,D0				;metemos en D0 el descritor D1 para indicar a LEECAR el canal
-    BSR LEECAR					;llamamos para que lea
-	CMP.L #-1,D0              	;si esta vacio LEECAR devuelve -1 en D0 a si que comprobamos IMPORTANTE
-	BEQ CONTSCAN				;si esta vacio hemos acabado
-	*ahora mandamos el byte leido
-	MOVE.B  D0,(A1)+           	;metemos en el destino el byte que ha dejado LEECAR en D0
-	ADD.L   #1,D3               ;incrementamos el contador
-	CMP.W D3,D2               	;comprobamos contador = bytes a leer
-	BNE BUCSCAN
+	SCANB:
+	MOVE.L #1,D0             ;D0 ← 1, canal B para LEECAR
+	BSR LEECAR               ;llamamos a LEECAR
+	CMP.L #-1,D0             ;¿buffer vacío?
+	BEQ CONTSCAN             ;sí → salimos con lo leído
+	MOVE.B D0,(A1)+          ;guardamos byte leído en buffer
+	ADD.L #1,D3              ;D3++
+	SUB.W #1,D2              ;restamos byte leído al tamaño
+	CMP.W #0,D2              ;¿queda algo por leer?
+	BNE SCANB                ;sí → seguimos
+	* si no queda, caemos a CONTSCAN
 
 	CONTSCAN:
-	MOVE.L D3,D0				;si no hay errores guardamos contador en D0
+	MOVE.L D3,D0             ;D0 ← número de caracteres leídos
 	FNSCAN:
-	RTS					
+	RTS                      ;retorno de subrutina
+
 
 *****************************************************************
 *PRINT - Escritura no bloqueante
@@ -122,67 +132,67 @@ SCAN:
 
 	
 PRINT:
-   	*cargamos los parametros desde la pila igual qu en scan
-	MOVE.L  4(A7),A1 	;A1 puntero al buffer de destino
-	MOVE.W  8(A7),D4 	;D4 descriptor 0 o 1 para leer por A o por B
-	MOVE.W 10(A7),D2 	;D2 bytes a leer
-	CLR.L   D3          ;D3 contador
-	CLR.L 	D0			;iniciamos a 0
+	MOVE.L  4(A7),A1         ;A1 ← dirección del buffer de origen
+	CLR.L   D3               ;D3 ← 0, contador de caracteres escritos
+	MOVE.W  8(A7),D4         ;D4 ← descriptor: 0 para A, 1 para B
+	MOVE.W 10(A7),D2         ;D2 ← número de bytes a escribir
+	CLR.L   D0               ;D0 ← 0, valor de retorno
 
-	*si tamaño 0 salimos
-	CMP.W #0,D2
-    BEQ FINPRINT
+	CMP.W #0,D2              ;¿tamaño es cero?
+	BEQ FINPRINT             ;sí → no hay nada que escribir
 
-    *comprobación de descriptor igual que en SCAN
-    CMP.W   #0,D4
-    BEQ		CONTPRINT
-    CMP.W   #1,D4
-    BEQ     CONTPRINT
+	CMP.W #0,D4              ;¿descriptor A?
+	BEQ PRINTA               ;sí → imprimir por A
+	CMP.W #1,D4              ;¿descriptor B?
+	BEQ PRINTB               ;sí → imprimir por B
+	MOVE.L #$FFFFFFFF,D0     ;error: descriptor inválido, D0 ← -1
+	BRA FINPRINT             ;salimos
 
-	MOVE.L 	#$FFFFFFFF,D0
-	BRA FINPRINT	
-	
-	CONTPRINT:
-	MOVE.W  D4,D5 		;copiamos el descriptor 
-	ADD.L #2,D5			;al sumar dos cambiamos para activar transmision en ESCCAR
+	PRINTA:
+	MOVE.L #2,D0             ;D0 ← 2, canal A para ESCCAR
+	MOVE.B (A1)+,D1          ;D1 ← siguiente byte a enviar
+	BSR ESCCAR               ;llamamos a ESCCAR
+	CMP.L #-1,D0             ;¿buffer lleno?
+	BEQ ACTA                 ;sí → activar interrupción y salir
+	ADD.L #1,D3              ;D3++
+	CMP.L D3,D2              ;¿escribimos todo?
+	BEQ ACTA                 ;sí → salir
+	BRA PRINTA               ;no → siguiente byte
 
-	BUCP:
-	MOVE.L D4,D0		;metemos el descriptor correspondiente en D0
-    MOVE.B (A1)+,D1 	;carga siguiente byte en D1 para escribir
-    BSR ESCCAR 			;llamamos para que escriba 
-	CMP.L #-1,D0		;buffer lleno?
-	BEQ ACTINT
-    ADD.L #1,D3 		;++contador
-    CMP.L D3,D2 		;hemos cabado?
-    BEQ ACTINT 			;si pues fin
-	BRA BUCP
+	PRINTB:
+	MOVE.L #3,D0             ;D0 ← 3, canal B para ESCCAR
+	MOVE.B (A1)+,D1          ;D1 ← siguiente byte
+	BSR ESCCAR
+	CMP.L #-1,D0             ;¿buffer lleno?
+	BEQ ACTB                 ;sí → salir y activar interrupción
+	ADD.L #1,D3              ;D3++
+	CMP.L D3,D2              ;¿todo enviado?
+	BEQ ACTB
+	BRA PRINTB
 
-	ACTINT:
-	CMP.L #0,D3			;si el contador esta a 0 no activamos interrupción
-	BEQ ULTFIN
-	MOVE.W SR,D6		;guarda el SR actual en D6
-    MOVE.W #$2700,SR    ;desactiva interrupciones (nivel 7)
-	*vemos que transmisión activamos
-	CMP.W   #0,D4
-    BEQ		INTA
-    CMP.W   #1,D4
-    BEQ    	INTB
+	ACTA:
+	CMP.L #0,D3              ;¿se escribió algo?
+	BEQ FINPRINT             ;no → no activar interrupción
+	MOVE.W SR,D6             ;guardar SR
+	MOVE.W #$2700,SR         ;desactivar interrupciones
+	OR.B #1,IMR              ;activar interrupción TX A (bit 0)
+	MOVE.B IMR,MASKINT       ;actualizar máscara real
+	MOVE.W D6,SR             ;restaurar SR
+	BRA FINPRINT             ;salir
 
-	INTA:
-	OR.B	#1,IMR    	;activa transmision canal A
-	MOVE.B IMR,MASKINT 	;escribe la nueva máscara en IMR original
-    MOVE.W D6,SR        ;restaura el SR original
-	BRA ULTFIN	;seguimos
-	
-	INTB:
-	OR.B 	#16,IMR		;lo mismo para B
-	MOVE.B IMR,MASKINT 	;escribe la nueva máscara en IMR original
-    MOVE.W D6,SR           ;restaura el SR original
+	ACTB:
+	CMP.L #0,D3              ;¿algo escrito?
+	BEQ FINPRINT
+	MOVE.W SR,D6
+	MOVE.W #$2700,SR
+	OR.B #16,IMR             ;activar interrupción TX B (bit 4)
+	MOVE.B IMR,MASKINT
+	MOVE.W D6,SR
 
-	ULTFIN:
-	MOVE.L D3,D0 		;metemos contador en D0 
 	FINPRINT:
-	RTS
+	MOVE.L D3,D0             ;D0 ← número de caracteres escritos
+	RTS                      ;retorno
+
 
 
 
@@ -190,70 +200,67 @@ PRINT:
 *RTI - tratamiento de interrupciones
 *******************************************************************
 RTI:
-	*guardamos el estado actual del MC
-	MOVEM.L D0-D7/A0-A6,-(A7)	;protegemos registros
-	*vemos la causas de interrupción
+	MOVEM.L D0-D7,-(A7)	;guardamos todos los registros
+
 	BUCRTI:
-    MOVE.B EINT,D1	;en D1 el estado guardamos estado
-	AND.B IMR,D1	;filtramos solo las habilitadas
+	MOVE.B EINT,D1              ;D1 ← estado de interrupciones
+	AND.B IMR,D1                ;filtramos solo las interrupciones habilitadas
 
-   	BTST #1,D1     	;recepción A
+	BTST #1,D1                  ;¿recepción A?
 	BNE RECA
-	BTST #5,D1     	;recepción B
+	BTST #5,D1                  ;¿recepción B?
 	BNE RECB
-	BTST #3,D1     	;transmisión A
+	BTST #0,D1                  ;¿transmisión A?
 	BNE TRA
-	BTST #7,D1     	;transmisión B
+	BTST #4,D1                  ;¿transmisión B?
 	BNE TRB
-
-	BRA FINRTI		;ninguna activa salimos
+	BRA FINRTI                  ;no hay interrupciones → salir
 
 	RECA:
-	MOVE.B RBUFA,D1 	;D1 metemos dato de la DUART por A para que escriba
-	MOVE.L #0,D0       	;descritpor canal A = 0
-    BSR ESCCAR 			;llamamos a escritura
-	CMP.L #-1,D0		;si es -1 vacio salimos
-    BEQ FINRTI	
-	BRA BUCRTI			;repetimos
+	MOVE.B RBUFA,D1             ;leer byte recibido por canal A
+	MOVE.L #0,D0                ;D0 ← descriptor A
+	BSR ESCCAR                  ;escribimos en buffer interno
+	CMP.L #-1,D0                ;¿está lleno?
+	BEQ FINRTI
+	BRA BUCRTI                  ;revisamos si hay más interrupciones
 
 	RECB:
-    MOVE.B RBUFB,D1		;lo mismo para b
-	MOVE.L #1,D0  
-    BSR ESCCAR 		
-	CMP.L #-1,D0		
-    BEQ FINRTI	
-	BRA BUCRTI			
+	MOVE.B RBUFB,D1             ;leer byte recibido por canal B
+	MOVE.L #1,D0
+	BSR ESCCAR
+	CMP.L #-1,D0
+	BEQ FINRTI
+	BRA BUCRTI
 
 	TRA:
-	MOVE.L #2,D0  			;descriptor 2 transmision A
-    BSR LEECAR 				;extraer dato del buffer interno
-    CMP.L #-1,D0			;esta vacio?
-    BEQ FINA				;desactivamos canal
-    MOVE.B D0,TBUFA			;enviamos a DAURT si no lo esta
-    BRA BUCRTI				;repetimos
+	MOVE.L #2,D0                ;D0 ← descriptor de transmisión A
+	BSR LEECAR                  ;leer byte desde buffer interno
+	CMP.L #-1,D0
+	BEQ INHA                    ;si está vacío, desactivar interrupción
+	MOVE.B D0,TBUFA             ;enviar a DUART
+	BRA BUCRTI
 
 	TRB:
-	MOVE.L #3,D0  			;descriptor 3 transmision B
-    BSR LEECAR				;lo mismo que a
-    CMP.L #-1,D0
-    BEQ FINB
-    MOVE.B D0,TBUFB
-    BRA FINRTI
+	MOVE.L #3,D0
+	BSR LEECAR
+	CMP.L #-1,D0
+	BEQ INHB
+	MOVE.B D0,TBUFB
+	BRA BUCRTI
 
-	FINA:
-    AND.B #%11111110,IMR	;deshabilitamos transmision de A
-    MOVE.B IMR,MASKINT		;actualizamos la mascara
-    BRA BUCRTI				;vuelta al bucle
+	INHA:
+	AND.B #%11111110,IMR        ;desactivar bit 0 (TX A)
+	MOVE.B IMR,MASKINT
+	BRA BUCRTI
 
-	FINB:
-    AND.B #%11101111,IMR	;deshabilitamos transmision de B
-    MOVE.B IMR,MASKINT		
-    BRA BUCRTI
+	INHB:
+	AND.B #%11101111,IMR        ;desactivar bit 4 (TX B)
+	MOVE.B IMR,MASKINT
+	BRA BUCRTI
 
 	FINRTI:
-	MOVEM.L (A7)+,D0-D7/A0-A6	;restauramos registros
-	RTE							;RTE restuara SC y PC
-
+	MOVEM.L (A7)+,D0-D7	;recuperamos todos los registros
+	RTE                         ;retorno de interrupción
 
 MAIN:
     BSR INIT             	;Inicializa buffers, DUART
