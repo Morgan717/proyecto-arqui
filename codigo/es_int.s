@@ -281,9 +281,9 @@ MAIN:
 	PRINTLOOP:
 	MOVE.W #5,D2         	;tamaño de bloque
 
-	PRINTB:
+	PRINTBLOQUE:
 	MOVE.W D2,-(SP)			;preparamos pila
-	MOVE.W #0,-(SP)
+	MOVE.W #1,-(SP)
 	MOVE.L PARDIR,-(SP)
 	BSR PRINT
 	ADD.L #8,SP
@@ -293,13 +293,13 @@ MAIN:
 	BEQ SAL
 
 	SUB.W D0,D2
-	BNE PRINTB				;todavia no pues otra vez a print
+	BNE PRINTBLOQUE				;todavia no pues otra vez a print
 
 	CMP.W #5,D3
 	BHI PRINTLOOP			;si jsuto queda la mitad del bloque otra vez a print
 
 	MOVE.W D3,D2            ;si hay caracteres de mqs del bloque
-	BRA PRINTB
+	BRA PRINTBLOQUE
 
 	SAL:
 	BRA PRUEBA
