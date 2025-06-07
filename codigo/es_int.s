@@ -173,16 +173,15 @@ PRINT:
     BEQ		INTA
     CMP.W   #1,D4
     BEQ    	INTB
-
 	INTA:
 	OR.B	#1,IMR    	;activa transmision canal A
-	MOVE.B IMR,MASKINT 	;escribe la nueva máscara en IMR original
-    MOVE.W D6,SR        ;restaura el SR original
-	BRA FINPRINT	;seguimos
-	
+	BRA FININT			;seguimos
+
 	INTB:
 	OR.B 	#16,IMR		;lo mismo para B
-	MOVE.B IMR,MASKINT 	;escribe la nueva máscara en IMR original
+	
+	FININT:
+	MOVE.B IMR,MASKINT 		;escribe la nueva máscara en IMR original
     MOVE.W D6,SR           ;restaura el SR original
 
 	FINPRINT:
