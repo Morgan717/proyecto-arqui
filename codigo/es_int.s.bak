@@ -1,0 +1,133 @@
+	ORG     $0		;inicio del programa
+	ORG		$400	;valor inicial para puntero de pila
+	DC.L    START	;etiqueta principal de programa
+	ORG     $400	;volvemos al codigo
+
+	***********************************************************
+	* Proyecto E/S mediante interrupciones
+	* Curso 2024-2025
+	* Alumno: Gabriel Mateo Morgan
+	* Grupo: 4F2T
+	************************************************************
+
+
+	*definimos los puertos de la DUART 
+	*puertos especificos por canal
+MRA EQU $EFFC01 ;MR1A y MR2A modo registro
+MRB EQU $EFFC11 ;igual pero para B
+
+
+CLKA EQU $EFFC03	;seleccionar reloj 
+CLKB EQU $EFFC13	;seleccionar reloj 
+
+	* recepcion y transmision 
+CTRLA EQU $EFFC05	;registro de ctrl A
+CTRLB EQU $EFFC15        	
+	
+	*puertos comunes a ambos canales
+CTRLG 	EQU $EFFC09 ;ctrl de velocidades general
+MASKINT EQU $EFFC0B ;mascara para interrupciones
+EINT 	EQU $EFFC0B ;mismo puerto leer estado interrupciones
+VECINT 	EQU $EFFC19 ;vector de interrupciones
+
+
+
+START:
+	********************************************************
+	*INIT - Inicializa la DUART y buffers
+	********************************************************
+
+INIT:
+	LINK A6,#0 ;establece marco de pila
+	BSR INI_BUF ;inicio buffers
+
+	*primero reiniciamos el puntero de registro de modo para los dos canales para que apunten a MR1
+	*por si acaso estaba desplazado
+	MOVE.B #%00010000, CTRLA  ;con %00010000 activamos en el control de registro de A resetear el MR1
+	MOVE.B #%00010000, CTRLB  ;lo mismo para el canal B
+
+	*ahora tenemos que configurar el formato a 8 bits
+	le decimos a la DUART cuantos bits son cada caracter
+		MOVE.B #%00000011, MRA	;00000011 -> 8 bits ya que 00 son 5bits por caracter a si que 3 mas
+	MOVE.B #%00000000, MRA	;desactivamos el eco para que la duart no responda y añada interrupciones
+	MOVE.B #%00000011, MRB	;hacemos lo mismo para el canal B
+	MOVE.B #%00000000, MRB
+
+	*elegimos una velocidad de bps
+	MOVE.B #%11001100, CLKA  ; 1100 son 38400 bps eso se ve en una tablita
+	MOVE.B #%11001100, CLKB  ; y repetimos los dos 1100 para cada conjunto
+	MOVE.B #0, CTRLG ;ponemos el ACR a 0 para usar conjunto 1
+
+	*activar transmision y recepcion simultanea
+	MOVE.B #%00001010, CTRLA   ; bit 1 activa recepcion bit 3 activa transmision
+	MOVE.B #%00001010, CTRLB   ; igual que en el A
+
+	*definimos un vector interno
+	MOVE.B #$40, VECINT ;cuando haya interrupcion y usara el 64 del vector para encontrar RTI
+
+	*enmascarar interrupciones solo recepción en canales A y B
+	MOVE.B #%00100010, MASKINT ;  bit 1 y bit 5 habilitan solo recepcion
+
+	UNLK A6	;restaura marco de pila
+	RTS	;retorno
+
+	**********************************************************
+	* SCAN - Lectura no bloqueante
+	**********************************************************
+
+SCAN:
+
+	LINK A6,#0	;marco de pila
+	*cargamos los parametros desde la pila
+	MOVE.L  4(A6),A1             ;A1 <- puntero al buffer de destino
+	MOVE.W  8(A6),D1             ;D1 <- descriptor 0 o 1 para leer por A o por B
+	MOVE.W 10(A6),D2             ;D2 <- bytes a leer
+
+	*comprobar descriptor
+	CMP.W   #0,D1				;vale si D1 es 0 saltamos al bucle y no hay eror
+	BEQ     BIEND
+	CMP.W   #1,D1				;lo mismo si es 1 saltamos al bucle
+	BEQ     BIEND
+	MOVE.L  #-1,D0				;error ya que D1 no es ni 0 ni 1 osea resultado -1
+	BRA     EFNSCAN		;y terminamos
+
+	BIEND:
+	CLR.L   D3                  ;ponemos D3 contador a 0 clear D3
+
+	BUCSCAN:
+	CMP.W   D3,D2               ;primero comprobamos contador = bytes a leer
+	BEQ     FNSCAN				;si hemos terminado saltamos a fin
+
+	MOVE.L  D1,D0				;metemos en D0 el descritor D1 para indicar a LEECAR el canal
+	BSR     LEECAR				;saltamos a LEECAR
+	CMP.L   #-1,D0              ;si esta vacio LEECAR devuelve -1 en D0 a si que comprobamos IMPORTANTE
+		BEQ     BUCSCAN				;si esta vacio hemos acabado
+	*ahora mandamos el byte leido
+	MOVE.B  D0,(A1)             ;metemos en el destino el byte que ha dejado LEECAR en D0
+	ADD.L	#1, A1				;avanzamos en 1 el puntero al destino IMPORTANTE
+	ADD.L   #1,D3               ;incrementamos el contador
+	BRA     BUCSCAN				;vuelta al bucle
+
+	FNSCAN:
+	MOVE.L D3,D0				;si no hay errores guardamos contador en D0
+
+	EFNSCAN:			;si hay error no modificamos D0
+	UNLK    A6			;destruimo marco de pila
+	RTS					;retorno
+
+	*****************************************************************
+	*PRINT - Escritura no bloqueante
+	*****************************************************************
+
+	PRINT:
+	RTS
+
+	*******************************************************************
+	;RTI - tratamiento de interrupciones
+	*******************************************************************
+
+	RTI:
+	RTE		;retorno de interrupción
+
+	INCLUDE bib_aux.s      ;para la subrutinas auxiliares
+
