@@ -134,40 +134,31 @@ PRINT:
     BEQ FINPRINT
 
 	CMP.W #0,D4              ;canal A
-	BEQ PRINTA               
+	BEQ BUCP               
 	CMP.W #1,D4              ;canal B
-	BEQ PRINTB               
+	BEQ BUCP            
 	MOVE.L #$FFFFFFFF,D0     ;descriptor inválido D0 = -1
 	BRA FINPRINT             ;salimos
 
-	*aqui tenemos que dividir bucles para a y b ya que metemos un valor disintos a esccar
-	PRINTA:
-	MOVE.L #2,D0             ;canal A para ESCCAR
-	MOVE.B (A1)+,D1          ;D1 siguiente byte a enviar
-	BSR ESCCAR               ;llamamos a ESCCAR
-	CMP.L #-1,D0             ;buffer lleno?
-	BEQ ACTINT                 ;si activamos interrupción y salir
-	ADD.L #1,D3              ;D3++
-	CMP.L D3,D2              ;terminamos?
-	BEQ ACTINT                 ;si salir
-	BRA PRINTA               ;no siguiente byte
-
-	PRINTB:
-	MOVE.L #3,D0             
-	MOVE.B (A1)+,D1          
-	BSR ESCCAR
-	CMP.L #-1,D0             
-	BEQ ACTINT                
-	ADD.L #1,D3              
-	CMP.L D3,D2              
+	BUCP:
+	MOVE.L D4,D0		;metemos el descriptor correspondiente en D0
+	ADD.L #2,D0			;sumamos 2 para activar transmision en esccar
+    MOVE.B (A1)+,D1 	;carga siguiente byte en D1 para escribir
+    BSR ESCCAR 			;llamamos para que escriba 
+	CMP.L #-1,D0		;buffer lleno?
 	BEQ ACTINT
-	BRA PRINTB
+    ADD.L #1,D3 		;++contador
+    CMP.L D3,D2 		;hemos cabado?
+    BEQ ACTINT 			;si pues fin
+	BRA BUCP
+
 
 	ACTINT:
 	CMP.L #0,D3			;si el contador esta a 0 no activamos interrupción
 	BEQ FINPRINT
 	MOVE.W SR,D6		;guarda el SR actual en D6
     MOVE.W #$2700,SR    ;desactiva interrupciones (nivel 7)
+	
 	*vemos que transmisión activamos
 	CMP.W   #0,D4
     BEQ		INTA
