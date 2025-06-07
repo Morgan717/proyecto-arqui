@@ -80,51 +80,41 @@ INIT:
 **********************************************************
 
 SCAN:
-	MOVE.L  4(A7),A1         ;A1 ← dirección del buffer de destino
-	CLR.L   D3               ;D3 ← 0, contador de caracteres leídos
-	MOVE.W  8(A7),D4         ;D4 ← descriptor: 0 para A, 1 para B
-	MOVE.W 10(A7),D2         ;D2 ← número de bytes a leer
-	CLR.L   D0               ;D0 ← 0, valor de retorno
 
-	CMP.W #0,D2              ;¿tamaño es cero?
-	BEQ FNSCAN               ;sí → fin de lectura
+	*cargamos los parametros desde la pila
+	MOVE.L  4(A7),A1            ;A1 puntero al buffer de destino
+	MOVE.W  8(A7),D4            ;D4 descriptor 0 o 1 para leer por A o por B
+	MOVE.W 10(A7),D2            ;D2 bytes a leer
+	CLR.L   D3                  ;ponemos D3 contador a 0 clear D3
+	CLR.L 	D0					;lo iniciamos a 0
 
-	CMP.W #0,D4              ;¿descriptor A?
-	BEQ SCANA                ;sí → leer de línea A
-	CMP.W #1,D4              ;¿descriptor B?
-	BEQ SCANB                ;sí → leer de línea B
-	MOVE.L #$FFFFFFFF,D0     ;error: descriptor no válido, D0 ← -1
-	BRA FNSCAN               ;salimos
+	*si tamaño 0 salimos
+	CMP.W #0,D2
+    BEQ FNSCAN
 
-	SCANA:
-	MOVE.L #0,D0             ;D0 ← 0, canal A para LEECAR
-	BSR LEECAR               ;llamamos a LEECAR
-	CMP.L #-1,D0             ;¿buffer vacío?
-	BEQ CONTSCAN             ;sí → salimos con lo leído
-	MOVE.B D0,(A1)+          ;guardamos el byte leído en el buffer
-	ADD.L #1,D3              ;D3++
-	SUB.W #1,D2              ;decrementamos tamaño restante
-	CMP.W #0,D2              ;¿ya leímos todo?
-	BNE SCANA                ;no → seguir leyendo
-	BRA CONTSCAN             ;sí → salimos
+	*comprobar descriptor
+	CMP.W   #0,D4				;vale si D4 es 0 saltamos al bucle y no hay eror
+	BEQ     BUCSCAN
+	CMP.W   #1,D4				;lo mismo si es 1 saltamos al bucle
+	BEQ 	BUCSCAN
+	MOVE.L 	#$FFFFFFFF,D0		;error ya que D4 no es ni 0 ni 1 osea resultado -1
+	BRA FNSCAN					
 
-	SCANB:
-	MOVE.L #1,D0             ;D0 ← 1, canal B para LEECAR
-	BSR LEECAR               ;llamamos a LEECAR
-	CMP.L #-1,D0             ;¿buffer vacío?
-	BEQ CONTSCAN             ;sí → salimos con lo leído
-	MOVE.B D0,(A1)+          ;guardamos byte leído en buffer
-	ADD.L #1,D3              ;D3++
-	SUB.W #1,D2              ;restamos byte leído al tamaño
-	CMP.W #0,D2              ;¿queda algo por leer?
-	BNE SCANB                ;sí → seguimos
-	* si no queda, caemos a CONTSCAN
+	BUCSCAN:
+	MOVE.L  D4,D0				;metemos en D0 el descritor D1 para indicar a LEECAR el canal
+    BSR LEECAR					;llamamos para que lea
+	CMP.L #-1,D0              	;si esta vacio LEECAR devuelve -1 en D0 a si que comprobamos IMPORTANTE
+	BEQ CONTSCAN				;si esta vacio hemos acabado
+	*ahora mandamos el byte leido
+	MOVE.B  D0,(A1)+           	;metemos en el destino el byte que ha dejado LEECAR en D0
+	ADD.L   #1,D3               ;incrementamos el contador
+	CMP.W D3,D2               	;comprobamos contador = bytes a leer
+	BNE BUCSCAN
 
 	CONTSCAN:
-	MOVE.L D3,D0             ;D0 ← número de caracteres leídos
+	MOVE.L D3,D0				;si no hay errores guardamos contador en D0
 	FNSCAN:
-	RTS                      ;retorno de subrutina
-
+	RTS	
 
 *****************************************************************
 *PRINT - Escritura no bloqueante
@@ -286,7 +276,7 @@ MAIN:
 	MOVE.W #10,D3           ;total a escribir
 	MOVE.L #BUFFER,PARDIR 	;parametro BUFFER = comienzo del buffer
 	PRINTLOOP:
-	MOVE.W #5,D2         	;tamaño de bloque
+	MOVE.W #10,D2         	;tamaño de bloque
 
 	PRINTBLOQUE:
 	MOVE.W D2,-(SP)			;preparamos pila
