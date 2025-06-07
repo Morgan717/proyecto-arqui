@@ -146,10 +146,10 @@ PRINT:
 	MOVE.B (A1)+,D1          ;D1 siguiente byte a enviar
 	BSR ESCCAR               ;llamamos a ESCCAR
 	CMP.L #-1,D0             ;buffer lleno?
-	BEQ ACTA                 ;si activamos interrupción y salir
+	BEQ ACTINT                 ;si activamos interrupción y salir
 	ADD.L #1,D3              ;D3++
 	CMP.L D3,D2              ;terminamos?
-	BEQ ACTA                 ;si salir
+	BEQ ACTINT                 ;si salir
 	BRA PRINTA               ;no siguiente byte
 
 	PRINTB:
@@ -157,30 +157,33 @@ PRINT:
 	MOVE.B (A1)+,D1          
 	BSR ESCCAR
 	CMP.L #-1,D0             
-	BEQ ACTB                 
+	BEQ ACTINT                
 	ADD.L #1,D3              
 	CMP.L D3,D2              
-	BEQ ACTB
+	BEQ ACTINT
 	BRA PRINTB
 
-	ACTA:
-	CMP.L #0,D3              ;se escribio algo?
-	BEQ FINPRINT             ;no activamos interrupcion
-	MOVE.W SR,D6             ;guardamos SR
-	MOVE.W #$2700,SR         ;desactivar interrupciones
-	OR.B #1,IMR              ;activar interrupción TX A (bit 0)
-	MOVE.B IMR,MASKINT       ;actualizar máscara real
-	MOVE.W D6,SR             ;restaurar SR
-	BRA FINPRINT             ;salir
-
-	ACTB:
-	CMP.L #0,D3              ;¿algo escrito?
+	ACTINT:
+	CMP.L #0,D3			;si el contador esta a 0 no activamos interrupción
 	BEQ FINPRINT
-	MOVE.W SR,D6
-	MOVE.W #$2700,SR
-	OR.B #16,IMR             ;activar interrupción TX B (bit 4)
-	MOVE.B IMR,MASKINT
-	MOVE.W D6,SR
+	MOVE.W SR,D6		;guarda el SR actual en D6
+    MOVE.W #$2700,SR    ;desactiva interrupciones (nivel 7)
+	*vemos que transmisión activamos
+	CMP.W   #0,D4
+    BEQ		INTA
+    CMP.W   #1,D4
+    BEQ    	INTB
+
+	INTA:
+	OR.B	#1,IMR    	;activa transmision canal A
+	MOVE.B IMR,MASKINT 	;escribe la nueva máscara en IMR original
+    MOVE.W D6,SR        ;restaura el SR original
+	BRA FINPRINT	;seguimos
+	
+	INTB:
+	OR.B 	#16,IMR		;lo mismo para B
+	MOVE.B IMR,MASKINT 	;escribe la nueva máscara en IMR original
+    MOVE.W D6,SR           ;restaura el SR original
 
 	FINPRINT:
 	MOVE.L D3,D0             ;D0 ← número de caracteres escritos
