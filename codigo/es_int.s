@@ -122,48 +122,51 @@ SCAN:
 
 	
 PRINT:
-	MOVE.L  4(A7),A1         ;A1 ← dirección del buffer de origen
-	CLR.L   D3               ;D3 ← 0, contador de caracteres escritos
-	MOVE.W  8(A7),D4         ;D4 ← descriptor: 0 para A, 1 para B
-	MOVE.W 10(A7),D2         ;D2 ← número de bytes a escribir
-	CLR.L   D0               ;D0 ← 0, valor de retorno
+	*cargamos los parametros desde la pila igual qu en scan
+	MOVE.L  4(A7),A1 	;A1 puntero al buffer de destino
+	MOVE.W  8(A7),D4 	;D4 descriptor 0 o 1 para leer por A o por B
+	MOVE.W 10(A7),D2 	;D2 bytes a leer
+	CLR.L   D3          ;D3 contador
+	CLR.L 	D0			;iniciamos a 0
 
-	CMP.W #0,D2              ;¿tamaño es cero?
-	BEQ FINPRINT             ;sí → no hay nada que escribir
+	*si tamaño 0 salimos
+	CMP.W #0,D2
+    BEQ FINPRINT
 
-	CMP.W #0,D4              ;¿descriptor A?
-	BEQ PRINTA               ;sí → imprimir por A
-	CMP.W #1,D4              ;¿descriptor B?
-	BEQ PRINTB               ;sí → imprimir por B
-	MOVE.L #$FFFFFFFF,D0     ;error: descriptor inválido, D0 ← -1
+	CMP.W #0,D4              ;canal A
+	BEQ PRINTA               
+	CMP.W #1,D4              ;canal B
+	BEQ PRINTB               
+	MOVE.L #$FFFFFFFF,D0     ;descriptor inválido D0 = -1
 	BRA FINPRINT             ;salimos
 
+	*aqui tenemos que dividir bucles para a y b ya que metemos un valor disintos a esccar
 	PRINTA:
-	MOVE.L #2,D0             ;D0 ← 2, canal A para ESCCAR
-	MOVE.B (A1)+,D1          ;D1 ← siguiente byte a enviar
+	MOVE.L #2,D0             ;canal A para ESCCAR
+	MOVE.B (A1)+,D1          ;D1 siguiente byte a enviar
 	BSR ESCCAR               ;llamamos a ESCCAR
-	CMP.L #-1,D0             ;¿buffer lleno?
-	BEQ ACTA                 ;sí → activar interrupción y salir
+	CMP.L #-1,D0             ;buffer lleno?
+	BEQ ACTA                 ;si activamos interrupción y salir
 	ADD.L #1,D3              ;D3++
-	CMP.L D3,D2              ;¿escribimos todo?
-	BEQ ACTA                 ;sí → salir
-	BRA PRINTA               ;no → siguiente byte
+	CMP.L D3,D2              ;terminamos?
+	BEQ ACTA                 ;si salir
+	BRA PRINTA               ;no siguiente byte
 
 	PRINTB:
-	MOVE.L #3,D0             ;D0 ← 3, canal B para ESCCAR
-	MOVE.B (A1)+,D1          ;D1 ← siguiente byte
+	MOVE.L #3,D0             
+	MOVE.B (A1)+,D1          
 	BSR ESCCAR
-	CMP.L #-1,D0             ;¿buffer lleno?
-	BEQ ACTB                 ;sí → salir y activar interrupción
-	ADD.L #1,D3              ;D3++
-	CMP.L D3,D2              ;¿todo enviado?
+	CMP.L #-1,D0             
+	BEQ ACTB                 
+	ADD.L #1,D3              
+	CMP.L D3,D2              
 	BEQ ACTB
 	BRA PRINTB
 
 	ACTA:
-	CMP.L #0,D3              ;¿se escribió algo?
-	BEQ FINPRINT             ;no → no activar interrupción
-	MOVE.W SR,D6             ;guardar SR
+	CMP.L #0,D3              ;se escribio algo?
+	BEQ FINPRINT             ;no activamos interrupcion
+	MOVE.W SR,D6             ;guardamos SR
 	MOVE.W #$2700,SR         ;desactivar interrupciones
 	OR.B #1,IMR              ;activar interrupción TX A (bit 0)
 	MOVE.B IMR,MASKINT       ;actualizar máscara real
