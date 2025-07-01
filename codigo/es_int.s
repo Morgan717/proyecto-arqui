@@ -133,12 +133,12 @@ PRINT:
 	CMP.W #0,D2
     BEQ FINPRINT
 
-	CMP.W #0,D4              ;canal A
+	CMP.W #0,D4             ;canal A
 	BEQ BUCP               
-	CMP.W #1,D4              ;canal B
+	CMP.W #1,D4             ;canal B
 	BEQ BUCP            
-	MOVE.L #$FFFFFFFF,D0     ;descriptor inválido D0 = -1
-	BRA FINPRINT             ;salimos
+	MOVE.L #$FFFFFFFF,D0    ;descriptor inválido D0 = -1
+	BRA FINMALP	            ;salimos
 
 	BUCP:
 	MOVE.L D4,D0		;metemos el descriptor correspondiente en D0
@@ -169,15 +169,16 @@ PRINT:
 	BRA FININT			;seguimos
 
 	INTB:
-	OR.B 	#16,IMR		;lo mismo para B
+	OR.B 	#16,IMR			;lo mismo para B
 	
 	FININT:
 	MOVE.B IMR,MASKINT 		;escribe la nueva máscara en IMR original
-    MOVE.W D6,SR           ;restaura el SR original
+    MOVE.W D6,SR           	;restaura el SR original
 
 	FINPRINT:
-	MOVE.L D3,D0             ;D0 ← número de caracteres escritos
-	RTS                      ;retorno
+	MOVE.L D3,D0            ;D0 ← número de caracteres escritos
+	FINMALP:				; para no sobreescribir D0 al tener una mala entrada
+	RTS                     ;retorno
 
 
 
@@ -200,7 +201,7 @@ RTI:
 	BNE TRA
 	BTST #4,D1                  ;¿transmisión B?
 	BNE TRB
-	BRA FINRTI                  ;no hay interrupciones → salir
+	BRA FINRTI                  ;no hay interrupciones -> salir
 
 	RECA:
 	MOVE.B RBUFA,D1             ;leer byte recibido por canal A
@@ -219,7 +220,7 @@ RTI:
 	BRA BUCRTI
 
 	TRA:
-	MOVE.L #2,D0                ;D0 ← descriptor de transmisión A
+	MOVE.L #2,D0                ;D0 <- descriptor de transmisión A
 	BSR LEECAR                  ;leer byte desde buffer interno
 	CMP.L #-1,D0
 	BEQ INHA                    ;si está vacío, desactivar interrupción
@@ -245,7 +246,7 @@ RTI:
 	BRA BUCRTI
 
 	FINRTI:
-	MOVEM.L (A7)+,D0-D7	;recuperamos todos los registros
+	MOVEM.L (A7)+,D0-D7			;recuperamos todos los registros
 	RTE                         ;retorno de interrupción
 
 MAIN:
@@ -286,7 +287,7 @@ MAIN:
 	BEQ SAL
 
 	SUB.W D0,D2
-	BNE PRINTBLOQUE				;todavia no pues otra vez a print
+	BNE PRINTBLOQUE			;todavia no pues otra vez a print
 
 	CMP.W #5,D3
 	BHI PRINTLOOP			;si jsuto queda la mitad del bloque otra vez a print
