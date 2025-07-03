@@ -80,11 +80,11 @@ INIT:
 **********************************************************
 
 SCAN:
-
+	LINK A6,#0 *Se crea el marco de pila
 	*cargamos los parametros desde la pila
-	MOVE.L  4(A7),A1            ;A1 puntero al buffer de destino
-	MOVE.W  8(A7),D4            ;D4 descriptor 0 o 1 para leer por A o por B
-	MOVE.W 10(A7),D2            ;D2 bytes a leer
+	MOVE.L  8(A6),A1            ;A1 puntero al buffer de destino
+	MOVE.W  12(A6),D4           ;D4 descriptor 0 o 1 para leer por A o por B
+	MOVE.W 14(A6),D2            ;D2 bytes a leer
 	CLR.L   D3                  ;ponemos D3 contador a 0 clear D3
 	CLR.L 	D0					;lo iniciamos a 0
 
@@ -114,7 +114,8 @@ SCAN:
 	CONTSCAN:
 	MOVE.L D3,D0				;si no hay errores guardamos contador en D0
 	FNSCAN:
-	RTS	
+	UNLK A6
+    RTS
 
 *****************************************************************
 *PRINT - Escritura no bloqueante
@@ -122,10 +123,13 @@ SCAN:
 
 	
 PRINT:
+
+	LINK A6,#0 *Se crea el marco de pila
+
 	*cargamos los parametros desde la pila igual qu en scan
-	MOVE.L  4(A7),A1 	;A1 puntero al buffer de destino
-	MOVE.W  8(A7),D4 	;D4 descriptor 0 o 1 para leer por A o por B
-	MOVE.W 10(A7),D2 	;D2 bytes a leer
+	MOVE.L  8(A6),A1 	;A1 puntero al buffer de destino
+	MOVE.W  12(A6),D4 	;D4 descriptor 0 o 1 para leer por A o por B
+	MOVE.W 14(A6),D2 	;D2 bytes a leer
 	CLR.L   D3          ;D3 contador
 	CLR.L 	D0			;iniciamos a 0
 
@@ -138,7 +142,7 @@ PRINT:
 	CMP.W #1,D4             ;canal B
 	BEQ BUCP            
 	MOVE.L #$FFFFFFFF,D0    ;descriptor inválido D0 = -1
-	BRA FINMALP	            ;salimos
+	RTS            			;salimos sin sobreescribir D0
 
 	BUCP:
 	MOVE.L D4,D0		;metemos el descriptor correspondiente en D0
@@ -176,8 +180,8 @@ PRINT:
     MOVE.W D6,SR           	;restaura el SR original
 
 	FINPRINT:
-	MOVE.L D3,D0            ;D0 ← número de caracteres escritos
-	FINMALP:				; para no sobreescribir D0 al tener una mala entrada
+	MOVE.L D3,D0            ;D0 <- número de caracteres escritos
+	UNLK A6
 	RTS                     ;retorno
 
 
@@ -187,10 +191,10 @@ PRINT:
 *RTI - tratamiento de interrupciones
 *******************************************************************
 RTI:
-	MOVEM.L D0-D7,-(A7)	;guardamos todos los registros
+	MOVEM.L D0-D7/A0-A6,-(A7)	;guardamos todos los registros
 
 	BUCRTI:
-	MOVE.B EINT,D1              ;D1 ← estado de interrupciones
+	MOVE.B EINT,D1              ;D1 <- estado de interrupciones
 	AND.B IMR,D1                ;filtramos solo las interrupciones habilitadas
 
 	BTST #1,D1                  ;¿recepción A?
@@ -205,7 +209,7 @@ RTI:
 
 	RECA:
 	MOVE.B RBUFA,D1             ;leer byte recibido por canal A
-	MOVE.L #0,D0                ;D0 ← descriptor A
+	MOVE.L #0,D0                ;D0 <- descriptor A
 	BSR ESCCAR                  ;escribimos en buffer interno
 	CMP.L #-1,D0                ;¿está lleno?
 	BEQ FINRTI
@@ -246,8 +250,8 @@ RTI:
 	BRA BUCRTI
 
 	FINRTI:
-	MOVEM.L (A7)+,D0-D7			;recuperamos todos los registros
-	RTE                         ;retorno de interrupción
+	MOVEM.L (A7)+,D0-D7/A0-A6		;recuperamos todos los registros
+	RTE                         	;retorno de interrupción
 
 MAIN:
     BSR INIT             	;Inicializa buffers, DUART

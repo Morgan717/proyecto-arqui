@@ -2,17 +2,17 @@
 
 	1.Conectar VPN de la uni
 
-	2.Desde termianl: >>ssh  alumno.apellido@triqui1.fi.upm.es
+	2.Desde termianl: >>ssh  g.mmorgan@triqui1.fi.upm.es
 	
 	3. >>exit 		para salir de triqui
 
 2. Copiar ficheros de la practica
 
-En home desde triqui creamos un fichero de la practica 
-	>mkdir practica_arqui-202X
+En home creamos un fichero de la practica 
+>mkdir practica_2025
 
 Y traemos varios ficheros importantes
-	>cp /usr/local/bsvc/bib_aux.s ~/practica_202X/
+>cp /usr/local/bsvc/bib_aux.s ~/practica_2025/
 
 
 3. Mover archivos de mi ordenador a triqui
@@ -21,19 +21,15 @@ Y traemos varios ficheros importantes
 		cd C:\y todo\UPM\Segundo\4to cuatri\Arquitectura\proyecto\codigo
 
 	2. Lanza un comando scp así:
-		scp .\es_int.s  alumno.apellido@triqui1.fi.upm.es:~/practica_2025/
+		scp .\es_int.s g.mmorgan@triqui.fi.upm.es:~/practica_2025/
 
 
 	3. copiar de triqui a mi ordenador
 		fuera de triqui ejecutar:
-		scp alumno.apellido@triqui1.fi.upm.es:~/practica_202X/es_int.lis *ruta a tu carpeta*
+		scp g.mmorgan@triqui.fi.upm.es:~/practica_2025/es_int.lis C:\Users\Asus\Downloads
 
 
 4. COMPILAR
-Hay varias formas para compilar la mas comoda es usar Escritorio UPM concretamente el ETSIINF (Ubuntu)
-	-Abres el escritorio upm
-	- ctrl + alt + t abres termimal 
-	-entras en triqui con 
 Desde la carpeta de la practica en triqui y desde la maquina virtual
 	1. > 68kasm -l es_int.s
 		devuelve los errores y warnings
